@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   BookOpen, 
   Search, 
@@ -8,10 +8,13 @@ import {
   XCircle, 
   Clock, 
   Plus, 
-  ArrowUpRight,
-  Download,
-  FileSpreadsheet,
-  Check
+  ArrowUpRight, 
+  Download, 
+  FileSpreadsheet, 
+  Check,
+  DollarSign,
+  TrendingUp,
+  FileCheck
 } from 'lucide-react';
 import { LedgerRecord, ExtractedDocument } from '../types';
 import { formatCurrency } from '../utils/arithmetic';
@@ -40,6 +43,29 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   const [newInv, setNewInv] = useState('');
   const [newAmount, setNewAmount] = useState('');
   const [newCategory, setNewCategory] = useState<LedgerRecord['categoria']>('Gastos Generales');
+
+  // Compute KPI statistics
+  const kpis = useMemo(() => {
+    let totalAmount = 0;
+    let reconciledCount = 0;
+    let discrepancyCount = 0;
+    let missingDocCount = 0;
+
+    ledger.forEach((rec) => {
+      totalAmount += rec.monto;
+      if (rec.estado_conciliacion === 'CONCILIADO') reconciledCount++;
+      if (rec.estado_conciliacion === 'DISCREPANCIA_MONTO') discrepancyCount++;
+      if (rec.estado_conciliacion === 'SIN_COMPROBANTE') missingDocCount++;
+    });
+
+    return {
+      totalAmount,
+      reconciledCount,
+      discrepancyCount,
+      missingDocCount,
+      reconciledPercent: ledger.length > 0 ? Math.round((reconciledCount / ledger.length) * 100) : 0,
+    };
+  }, [ledger]);
 
   const handleCreateRecord = (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,28 +107,28 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
     switch (status) {
       case 'CONCILIADO':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Conciliado</span>
           </span>
         );
       case 'DISCREPANCIA_MONTO':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
             <XCircle className="w-3.5 h-3.5" />
             <span>Diferencia {diff ? formatCurrency(diff) : ''}</span>
           </span>
         );
       case 'SIN_COMPROBANTE':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
             <AlertTriangle className="w-3.5 h-3.5" />
             <span>Sin Comprobante</span>
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-800 text-slate-300">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-slate-800 text-slate-300">
             <Clock className="w-3.5 h-3.5" />
             <span>Pendiente</span>
           </span>
@@ -135,49 +161,100 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-      {/* Header Info */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-wrap items-center justify-between gap-4">
+      
+      {/* Header Banner */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30">
-              <BookOpen className="w-4 h-4" />
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30">
+              <BookOpen className="w-5 h-5" />
             </div>
-            <h2 className="text-xl font-bold text-white">Libro Diario Contable de la Empresa</h2>
+            <div>
+              <h2 className="text-2xl font-extrabold text-white tracking-tight">Libro Diario Contable</h2>
+              <span className="text-xs text-indigo-300 font-semibold">Registro de órdenes de compra y asientos de la empresa</span>
+            </div>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-2xl mt-1 leading-relaxed">
-            Acá residen las órdenes de compra y asientos contables. Cotejo compara cada comprobante físico contra esta tabla para verificar montos, proveedores y duplicaciones.
+          <p className="text-xs sm:text-sm text-slate-400 max-w-2xl mt-2 leading-relaxed">
+            Cotejo cruza automáticamente cada comprobante físico recibido contra esta lista de asientos para confirmar importes, proveedores y evitar pagos duplicados.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={handleExportLedgerCsv}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold border border-slate-700 transition"
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-2xl text-xs font-bold border border-slate-700 transition"
           >
-            <Download className="w-3.5 h-3.5 text-indigo-400" />
+            <Download className="w-4 h-4 text-indigo-400" />
             <span>Exportar CSV</span>
           </button>
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition"
+            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition"
           >
             <Plus className="w-4 h-4" />
-            <span>Nuevo Asiento Contable</span>
+            <span>Nuevo Asiento</span>
           </button>
+        </div>
+      </div>
+
+      {/* KPI Financial Cards Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+        <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 space-y-1 shadow-lg">
+          <span className="text-slate-400 font-semibold block flex items-center gap-1.5">
+            <DollarSign className="w-4 h-4 text-indigo-400" />
+            Total Contabilizado
+          </span>
+          <span className="text-xl sm:text-2xl font-extrabold text-white font-mono block mt-1">
+            {formatCurrency(kpis.totalAmount)}
+          </span>
+          <span className="text-[11px] text-slate-500 block">{ledger.length} asientos en libro</span>
+        </div>
+
+        <div className="bg-slate-900 p-5 rounded-3xl border border-emerald-900/40 space-y-1 shadow-lg">
+          <span className="text-emerald-400 font-bold block flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            Conciliados con Factura
+          </span>
+          <span className="text-xl sm:text-2xl font-extrabold text-emerald-400 font-mono block mt-1">
+            {kpis.reconciledCount} / {ledger.length}
+          </span>
+          <span className="text-[11px] text-emerald-300/80 font-bold block">{kpis.reconciledPercent}% de cobertura física</span>
+        </div>
+
+        <div className="bg-slate-900 p-5 rounded-3xl border border-amber-900/40 space-y-1 shadow-lg">
+          <span className="text-amber-400 font-bold block flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            Sin Comprobante Físico
+          </span>
+          <span className="text-xl sm:text-2xl font-extrabold text-amber-400 font-mono block mt-1">
+            {kpis.missingDocCount}
+          </span>
+          <span className="text-[11px] text-amber-300/80 block">Asientos pendientes de respaldo</span>
+        </div>
+
+        <div className="bg-slate-900 p-5 rounded-3xl border border-rose-900/40 space-y-1 shadow-lg">
+          <span className="text-rose-400 font-bold block flex items-center gap-1.5">
+            <XCircle className="w-4 h-4 text-rose-400" />
+            Discrepancia de Monto
+          </span>
+          <span className="text-xl sm:text-2xl font-extrabold text-rose-400 font-mono block mt-1">
+            {kpis.discrepancyCount}
+          </span>
+          <span className="text-[11px] text-rose-300/80 block">Difieren del comprobante</span>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex-1 min-w-[240px] relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Buscar por proveedor, CUIT, factura o asiento..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-white placeholder:text-slate-500 outline-none focus:border-indigo-500 transition"
+            className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-white placeholder:text-slate-500 outline-none focus:border-indigo-500 transition font-sans"
           />
         </div>
 
@@ -185,7 +262,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-200 outline-none focus:border-indigo-500"
+            className="bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-slate-200 outline-none focus:border-indigo-500 font-semibold"
           >
             <option value="all">Todas las Categorías</option>
             <option value="Combustible">Combustible</option>
@@ -200,7 +277,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-200 outline-none focus:border-indigo-500"
+            className="bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-slate-200 outline-none focus:border-indigo-500 font-semibold"
           >
             <option value="all">Todos los Estados ({ledger.length})</option>
             <option value="CONCILIADO">Conciliados</option>
@@ -211,7 +288,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
       </div>
 
       {/* Main Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl shadow-xl overflow-hidden">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
@@ -278,7 +355,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-bold text-white">Agregar Asiento Contable</h3>
+            <h3 className="text-lg font-bold text-white">Agregar Asiento Contable al Libro Diario</h3>
             <form onSubmit={handleCreateRecord} className="space-y-3 text-xs">
               <div>
                 <label className="text-slate-300 font-bold block mb-1">Proveedor / Comercio</label>
@@ -365,6 +442,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
           </div>
         </div>
       )}
+
     </div>
   );
 };
